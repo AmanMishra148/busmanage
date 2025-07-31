@@ -1,60 +1,62 @@
-// Application Data
+// Application Data with Enhanced Family Support
 let buses = [
     {
         id: 1,
         name: "Bus 1",
         capacity: 56,
-        occupancy: 1
+        occupancy: 5
     },
     {
         id: 2,
-        name: "Bus 2",
+        name: "Bus 2", 
         capacity: 56,
-        occupancy: 1
+        occupancy: 0
     },
     {
         id: 3,
         name: "Bus 3",
         capacity: 56,
-        occupancy: 1
+        occupancy: 0
     }
 ];
 
-let participants = [
+let families = [
     {
         id: 1,
-        name: "Ram Kumar",
-        phone: "9876543210",
+        familyName: "Sharma",
+        members: [
+            {name: "Raj Sharma", age: 45, contact: "9876543210"},
+            {name: "Priya Sharma", age: 42, contact: "9876543211"},
+            {name: "Arjun Sharma", age: 18, contact: "9876543212"}
+        ],
         busId: 1,
-        seatNumber: 15,
-        paymentStatus: "paid",
-        amountPaid: 2500,
-        registrationDate: "2025-07-15"
+        seats: [1, 2, 3],
+        totalAmount: 4500,
+        paidAmount: 4500,
+        paymentStatus: "Paid"
     },
     {
         id: 2,
-        name: "Sita Devi",
-        phone: "9876543211",
+        familyName: "Patel",
+        members: [
+            {name: "Amit Patel", age: 38, contact: "9876543220"},
+            {name: "Sunita Patel", age: 35, contact: "9876543221"}
+        ],
         busId: 1,
-        seatNumber: 16,
-        paymentStatus: "pending",
-        amountPaid: 0,
-        registrationDate: "2025-07-16"
-    },
-    {
-        id: 3,
-        name: "Mohan Singh",
-        phone: "9876543212",
-        busId: 2,
-        seatNumber: 8,
-        paymentStatus: "paid",
-        amountPaid: 2500,
-        registrationDate: "2025-07-17"
+        seats: [4, 5],
+        totalAmount: 3000,
+        paidAmount: 1500,
+        paymentStatus: "Partial"
     }
 ];
 
+let pricing = {
+    adultFare: 1500,
+    childFare: 1000,
+    seniorFare: 1200
+};
+
 let tripSettings = {
-    ticketPrice: 2500,
     nextTripDate: "2025-08-15",
     destination: "Vaishno Devi",
     duration: "3 days",
@@ -62,21 +64,23 @@ let tripSettings = {
 };
 
 let currentBusId = 1;
-let selectedSeat = null;
-let currentParticipantForPayment = null;
+let selectedSeats = [];
+let isMultiSelectionMode = false;
+let currentFamilyForPayment = null;
 let financialChart = null;
 
 // Initialize Application
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing multi-bus application...');
+    console.log('DOM loaded, initializing enhanced family booking system...');
     initializeNavigation();
     initializeBusTabs();
+    initializeSelectionMode();
     generateBusLayout();
     updateDashboard();
     updateParticipantsTable();
     updateFinancialSection();
     initializeEventListeners();
-    console.log('Multi-bus application initialized successfully');
+    console.log('Enhanced family booking system initialized successfully');
 });
 
 // Navigation
@@ -127,6 +131,60 @@ function switchSection(sectionName) {
     }
 }
 
+// Selection Mode Management
+function initializeSelectionMode() {
+    const multiSelectionToggle = document.getElementById('multiSelectionMode');
+    const selectionModeLabel = document.getElementById('selectionModeLabel');
+    const selectionModeDescription = document.getElementById('selectionModeDescription');
+    
+    if (multiSelectionToggle) {
+        multiSelectionToggle.addEventListener('change', function() {
+            isMultiSelectionMode = this.checked;
+            updateSelectionModeUI();
+            clearAllSelections();
+        });
+    }
+}
+
+function updateSelectionModeUI() {
+    const selectionModeLabel = document.getElementById('selectionModeLabel');
+    const selectionModeDescription = document.getElementById('selectionModeDescription');
+    const selectedSeatsInfo = document.getElementById('selectedSeatsInfo');
+    
+    if (isMultiSelectionMode) {
+        if (selectionModeLabel) selectionModeLabel.textContent = 'Multiple Selection';
+        if (selectionModeDescription) {
+            selectionModeDescription.textContent = 'Click multiple seats to select them for family booking';
+        }
+        if (selectedSeatsInfo) selectedSeatsInfo.style.display = 'block';
+    } else {
+        if (selectionModeLabel) selectionModeLabel.textContent = 'Single Selection';
+        if (selectionModeDescription) {
+            selectionModeDescription.textContent = 'Click on individual seats to select one at a time';
+        }
+        if (selectedSeatsInfo) selectedSeatsInfo.style.display = 'none';
+    }
+    
+    updateSelectedSeatsDisplay();
+}
+
+function updateSelectedSeatsDisplay() {
+    const selectedSeatsList = document.getElementById('selectedSeatsList');
+    const assignSelectedSeatsBtn = document.getElementById('assignSelectedSeatsBtn');
+    
+    if (selectedSeatsList) {
+        if (selectedSeats.length === 0) {
+            selectedSeatsList.textContent = 'None';
+        } else {
+            selectedSeatsList.textContent = selectedSeats.sort((a, b) => a - b).join(', ');
+        }
+    }
+    
+    if (assignSelectedSeatsBtn) {
+        assignSelectedSeatsBtn.disabled = selectedSeats.length === 0;
+    }
+}
+
 // Bus Management
 function initializeBusTabs() {
     console.log('Initializing bus tabs...');
@@ -140,8 +198,11 @@ function initializeBusTabs() {
         busTab.className = `bus-tab ${bus.id === currentBusId ? 'active' : ''}`;
         busTab.dataset.busId = bus.id;
         
-        // Add occupancy indicator
-        const occupiedSeats = participants.filter(p => p.busId === bus.id).length;
+        // Calculate occupancy from families
+        const occupiedSeats = families
+            .filter(f => f.busId === bus.id)
+            .reduce((total, family) => total + family.seats.length, 0);
+        
         if (occupiedSeats > 0) {
             busTab.innerHTML = `
                 ${bus.name}
@@ -168,8 +229,8 @@ function switchToBus(busId) {
         }
     });
     
-    // Clear any seat selection
-    clearSeatSelection();
+    // Clear selections
+    clearAllSelections();
     
     // Update bus info and layout
     updateCurrentBusInfo();
@@ -180,7 +241,9 @@ function updateCurrentBusInfo() {
     const currentBus = buses.find(bus => bus.id === currentBusId);
     if (!currentBus) return;
     
-    const occupiedSeats = participants.filter(p => p.busId === currentBusId).length;
+    const occupiedSeats = families
+        .filter(f => f.busId === currentBusId)
+        .reduce((total, family) => total + family.seats.length, 0);
     const availableSeats = currentBus.capacity - occupiedSeats;
     
     // Update bus info display
@@ -195,7 +258,7 @@ function updateCurrentBusInfo() {
     if (currentBusTitle) currentBusTitle.textContent = `${currentBus.name} - Seat Layout`;
 }
 
-// Bus Layout Generation
+// Enhanced Bus Layout Generation
 function generateBusLayout() {
     console.log('Generating bus layout for bus:', currentBusId);
     const busLayout = document.getElementById('busLayout');
@@ -203,8 +266,15 @@ function generateBusLayout() {
     
     busLayout.innerHTML = '';
     
-    // Get participants for current bus
-    const busParticipants = participants.filter(p => p.busId === currentBusId);
+    // Get all booked seats for current bus from families
+    const bookedSeats = new Map();
+    families
+        .filter(f => f.busId === currentBusId)
+        .forEach(family => {
+            family.seats.forEach(seatNumber => {
+                bookedSeats.set(seatNumber, family);
+            });
+        });
     
     // Regular rows (1-10): 2 seats left + 3 seats right
     for (let row = 1; row <= 10; row++) {
@@ -217,7 +287,7 @@ function generateBusLayout() {
         
         for (let seatIndex = 1; seatIndex <= 2; seatIndex++) {
             const seatNumber = (row - 1) * 5 + seatIndex;
-            const seat = createSeat(seatNumber, busParticipants);
+            const seat = createSeat(seatNumber, bookedSeats);
             leftGroup.appendChild(seat);
         }
         
@@ -231,7 +301,7 @@ function generateBusLayout() {
         
         for (let seatIndex = 3; seatIndex <= 5; seatIndex++) {
             const seatNumber = (row - 1) * 5 + seatIndex;
-            const seat = createSeat(seatNumber, busParticipants);
+            const seat = createSeat(seatNumber, bookedSeats);
             rightGroup.appendChild(seat);
         }
         
@@ -249,7 +319,7 @@ function generateBusLayout() {
     lastRowGroup.className = 'seat-group';
     
     for (let seatIndex = 51; seatIndex <= 56; seatIndex++) {
-        const seat = createSeat(seatIndex, busParticipants);
+        const seat = createSeat(seatIndex, bookedSeats);
         lastRowGroup.appendChild(seat);
     }
     
@@ -257,7 +327,7 @@ function generateBusLayout() {
     busLayout.appendChild(lastRowDiv);
 }
 
-function createSeat(seatNumber, busParticipants) {
+function createSeat(seatNumber, bookedSeats) {
     const seat = document.createElement('div');
     seat.className = 'seat';
     seat.textContent = seatNumber;
@@ -265,37 +335,49 @@ function createSeat(seatNumber, busParticipants) {
     seat.dataset.busId = currentBusId;
     
     // Check if seat is booked
-    const participant = busParticipants.find(p => p.seatNumber === seatNumber);
-    if (participant) {
+    const family = bookedSeats.get(seatNumber);
+    if (family) {
         seat.classList.add('booked');
-        seat.title = `Occupied by ${participant.name}`;
+        if (family.members.length > 1) {
+            seat.classList.add('family-group');
+        }
+        seat.title = `Occupied by ${family.familyName} family`;
+    } else if (selectedSeats.includes(seatNumber)) {
+        seat.classList.add('selected');
+        seat.addEventListener('click', () => toggleSeatSelection(seatNumber));
     } else {
         seat.classList.add('available');
-        seat.addEventListener('click', () => selectSeat(seatNumber));
+        seat.addEventListener('click', () => toggleSeatSelection(seatNumber));
     }
     
     return seat;
 }
 
-function selectSeat(seatNumber) {
-    console.log('Selecting seat:', seatNumber, 'on bus:', currentBusId);
+function toggleSeatSelection(seatNumber) {
+    console.log('Toggling seat selection:', seatNumber);
     
-    // Clear previous selection
-    document.querySelectorAll('.seat.selected').forEach(seat => {
-        seat.classList.remove('selected');
-        seat.classList.add('available');
-    });
-    
-    // Select new seat
-    const seatElement = document.querySelector(`[data-seat="${seatNumber}"][data-bus-id="${currentBusId}"]`);
-    if (seatElement) {
-        seatElement.classList.remove('available');
-        seatElement.classList.add('selected');
+    if (isMultiSelectionMode) {
+        // Multi-selection mode
+        const seatIndex = selectedSeats.indexOf(seatNumber);
+        if (seatIndex > -1) {
+            // Deselect seat
+            selectedSeats.splice(seatIndex, 1);
+        } else {
+            // Select seat
+            selectedSeats.push(seatNumber);
+        }
+        
+        updateSelectedSeatsDisplay();
+        generateBusLayout(); // Refresh to show selection changes
+    } else {
+        // Single selection mode
+        selectedSeats = [seatNumber];
+        showSingleSeatInfo(seatNumber);
+        generateBusLayout(); // Refresh to show selection changes
     }
-    
-    selectedSeat = seatNumber;
-    
-    // Show seat selection info
+}
+
+function showSingleSeatInfo(seatNumber) {
     const selectedSeatSpan = document.getElementById('selectedSeatNumber');
     const selectedBusSpan = document.getElementById('selectedBusName');
     const seatSelectionInfo = document.getElementById('seatSelectionInfo');
@@ -307,23 +389,34 @@ function selectSeat(seatNumber) {
     if (seatSelectionInfo) seatSelectionInfo.style.display = 'block';
 }
 
+function clearAllSelections() {
+    selectedSeats = [];
+    updateSelectedSeatsDisplay();
+    
+    const seatSelectionInfo = document.getElementById('seatSelectionInfo');
+    if (seatSelectionInfo) seatSelectionInfo.style.display = 'none';
+    
+    generateBusLayout();
+}
+
 // Dashboard Updates
 function updateDashboard() {
     console.log('Updating dashboard...');
     
-    // Calculate totals across all buses
-    const totalParticipants = participants.length;
+    // Calculate totals across all families
+    const totalParticipants = families.reduce((total, family) => total + family.members.length, 0);
+    const totalFamilies = families.length;
     const totalCapacity = buses.length * 56;
     const availableSeats = totalCapacity - totalParticipants;
     
     // Update statistics
     const totalParticipantsEl = document.getElementById('totalParticipants');
-    const totalBusCapacityEl = document.getElementById('totalBusCapacity');
+    const totalFamiliesEl = document.getElementById('totalFamilies');
     const availableSeatsEl = document.getElementById('availableSeats');
     const nextTripDateEl = document.getElementById('nextTripDate');
     
     if (totalParticipantsEl) totalParticipantsEl.textContent = totalParticipants;
-    if (totalBusCapacityEl) totalBusCapacityEl.textContent = totalCapacity;
+    if (totalFamiliesEl) totalFamiliesEl.textContent = totalFamilies;
     if (availableSeatsEl) availableSeatsEl.textContent = availableSeats;
     
     // Format next trip date
@@ -340,8 +433,8 @@ function updateDashboard() {
     updateBusStatsGrid();
     
     // Update financial summary
-    const totalExpected = participants.length * tripSettings.ticketPrice;
-    const totalCollected = participants.reduce((sum, p) => sum + p.amountPaid, 0);
+    const totalExpected = families.reduce((sum, family) => sum + family.totalAmount, 0);
+    const totalCollected = families.reduce((sum, family) => sum + family.paidAmount, 0);
     const totalOutstanding = totalExpected - totalCollected;
     
     const totalExpectedEl = document.getElementById('totalExpected');
@@ -363,15 +456,16 @@ function updateBusStatsGrid() {
     busStatsGrid.innerHTML = '';
     
     buses.forEach(bus => {
-        const busParticipants = participants.filter(p => p.busId === bus.id);
-        const occupancy = busParticipants.length;
-        const occupancyPercent = Math.round((occupancy / bus.capacity) * 100);
+        const busOccupancy = families
+            .filter(f => f.busId === bus.id)
+            .reduce((total, family) => total + family.seats.length, 0);
+        const occupancyPercent = Math.round((busOccupancy / bus.capacity) * 100);
         
         const busStatItem = document.createElement('div');
         busStatItem.className = 'bus-stat-item';
         busStatItem.innerHTML = `
             <div class="bus-stat-name">${bus.name}</div>
-            <div class="bus-stat-occupancy">${occupancy}/${bus.capacity}</div>
+            <div class="bus-stat-occupancy">${busOccupancy}/${bus.capacity}</div>
             <div class="bus-stat-details">${occupancyPercent}% occupied</div>
         `;
         
@@ -421,39 +515,53 @@ function updateParticipantsTable() {
     
     tbody.innerHTML = '';
     
-    // Get filtered participants based on bus filter
+    // Get filtered families based on bus filter
     const busFilter = document.getElementById('filterByBus');
     const selectedBusFilter = busFilter ? busFilter.value : '';
     
-    let filteredParticipants = participants;
+    let filteredFamilies = families;
     if (selectedBusFilter) {
-        filteredParticipants = participants.filter(p => p.busId === parseInt(selectedBusFilter));
+        filteredFamilies = families.filter(f => f.busId === parseInt(selectedBusFilter));
     }
     
-    filteredParticipants.forEach(participant => {
-        const bus = buses.find(b => b.id === participant.busId);
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${participant.name}</td>
-            <td>${participant.phone}</td>
-            <td>${bus ? bus.name : 'N/A'}</td>
-            <td>${participant.seatNumber || '-'}</td>
-            <td><span class="status status--${getStatusClass(participant.paymentStatus)}">${participant.paymentStatus}</span></td>
-            <td>₹${participant.amountPaid.toLocaleString()}</td>
-            <td>
-                <div class="participant-actions">
-                    <button class="btn btn-small btn--secondary" onclick="editParticipant(${participant.id})">Edit</button>
-                    <button class="btn btn-small btn--primary" onclick="updatePayment(${participant.id})">Payment</button>
-                    <button class="btn btn-small btn--outline" onclick="removeParticipant(${participant.id})">Remove</button>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(row);
+    // Create rows for each family member
+    filteredFamilies.forEach(family => {
+        const bus = buses.find(b => b.id === family.busId);
+        
+        family.members.forEach((member, index) => {
+            const row = document.createElement('tr');
+            const isFirstMember = index === 0;
+            
+            row.innerHTML = `
+                <td>${member.name}</td>
+                <td>${member.age}</td>
+                <td>${member.contact}</td>
+                <td>
+                    ${family.familyName}
+                    ${isFirstMember ? '<span class="family-group-indicator">Family</span>' : ''}
+                </td>
+                <td>${bus ? bus.name : 'N/A'}</td>
+                <td>${isFirstMember ? family.seats.join(', ') : ''}</td>
+                <td>
+                    ${isFirstMember ? `<span class="status status--${getStatusClass(family.paymentStatus)}">${family.paymentStatus}</span>` : ''}
+                </td>
+                <td>${isFirstMember ? `₹${family.paidAmount.toLocaleString()}` : ''}</td>
+                <td>
+                    ${isFirstMember ? `
+                        <div class="participant-actions">
+                            <button class="btn btn-small btn--secondary" onclick="editFamily(${family.id})">Edit</button>
+                            <button class="btn btn-small btn--primary" onclick="updateFamilyPayment(${family.id})">Payment</button>
+                            <button class="btn btn-small btn--outline" onclick="removeFamily(${family.id})">Remove</button>
+                        </div>
+                    ` : ''}
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
     });
     
-    // Update bus and seat options in modals
+    // Update bus options
     updateBusOptions();
-    updateSeatOptions();
 }
 
 function updateBusFilterOptions() {
@@ -475,57 +583,43 @@ function updateBusFilterOptions() {
 }
 
 function updateBusOptions() {
-    const participantBus = document.getElementById('participantBus');
-    if (!participantBus) return;
-    
-    const currentValue = participantBus.value;
-    participantBus.innerHTML = '<option value="">Select Bus</option>';
-    
-    buses.forEach(bus => {
-        const option = document.createElement('option');
-        option.value = bus.id;
-        option.textContent = bus.name;
-        if (bus.id === parseInt(currentValue)) {
-            option.selected = true;
-        }
-        participantBus.appendChild(option);
-    });
-}
-
-function updateSeatOptions() {
-    const participantSeat = document.getElementById('participantSeat');
-    const participantBus = document.getElementById('participantBus');
-    
-    if (!participantSeat || !participantBus) return;
-    
-    const selectedBusId = parseInt(participantBus.value);
-    participantSeat.innerHTML = '<option value="">Select Seat (Optional)</option>';
-    
-    if (!selectedBusId) return;
-    
-    // Get booked seats for selected bus
-    const bookedSeats = participants
-        .filter(p => p.busId === selectedBusId && p.seatNumber)
-        .map(p => p.seatNumber);
-    
-    // Generate available seats (1-56)
-    for (let i = 1; i <= 56; i++) {
-        if (!bookedSeats.includes(i)) {
+    // Update family bus options
+    const familyBus = document.getElementById('familyBus');
+    if (familyBus) {
+        const currentValue = familyBus.value;
+        familyBus.innerHTML = '<option value="">Select Bus</option>';
+        
+        buses.forEach(bus => {
             const option = document.createElement('option');
-            option.value = i;
-            option.textContent = `Seat ${i}`;
-            participantSeat.appendChild(option);
-        }
+            option.value = bus.id;
+            option.textContent = bus.name;
+            if (bus.id === parseInt(currentValue)) {
+                option.selected = true;
+            }
+            familyBus.appendChild(option);
+        });
     }
     
-    // Pre-select if there's a selected seat for current bus
-    if (selectedSeat && selectedBusId === currentBusId) {
-        participantSeat.value = selectedSeat;
+    // Update individual participant bus options
+    const participantBus = document.getElementById('participantBus');
+    if (participantBus) {
+        const currentValue = participantBus.value;
+        participantBus.innerHTML = '<option value="">Select Bus</option>';
+        
+        buses.forEach(bus => {
+            const option = document.createElement('option');
+            option.value = bus.id;
+            option.textContent = bus.name;
+            if (bus.id === parseInt(currentValue)) {
+                option.selected = true;
+            }
+            participantBus.appendChild(option);
+        });
     }
 }
 
 function getStatusClass(status) {
-    switch(status) {
+    switch(status.toLowerCase()) {
         case 'paid': return 'success';
         case 'partial': return 'warning';
         case 'pending': return 'error';
@@ -538,11 +632,15 @@ function updateFinancialSection() {
     console.log('Updating financial section...');
     
     // Update settings
-    const ticketPriceInput = document.getElementById('ticketPriceInput');
+    const adultFareInput = document.getElementById('adultFareInput');
+    const childFareInput = document.getElementById('childFareInput');
+    const seniorFareInput = document.getElementById('seniorFareInput');
     const nextTripInput = document.getElementById('nextTripInput');
     const destinationInput = document.getElementById('destinationInput');
     
-    if (ticketPriceInput) ticketPriceInput.value = tripSettings.ticketPrice;
+    if (adultFareInput) adultFareInput.value = pricing.adultFare;
+    if (childFareInput) childFareInput.value = pricing.childFare;
+    if (seniorFareInput) seniorFareInput.value = pricing.seniorFare;
     if (nextTripInput) nextTripInput.value = tripSettings.nextTripDate;
     if (destinationInput) destinationInput.value = tripSettings.destination;
     
@@ -550,20 +648,20 @@ function updateFinancialSection() {
     updateBusPaymentsGrid();
     
     // Update reports
-    const outstandingCount = participants.filter(p => p.paymentStatus !== 'paid').length;
-    const collectionRate = participants.length > 0 ? 
-        Math.round((participants.filter(p => p.paymentStatus === 'paid').length / participants.length) * 100) : 0;
+    const outstandingFamilies = families.filter(f => f.paymentStatus !== 'Paid').length;
+    const collectionRate = families.length > 0 ? 
+        Math.round((families.filter(f => f.paymentStatus === 'Paid').length / families.length) * 100) : 0;
     
     const busesWithFullPayment = buses.filter(bus => {
-        const busParticipants = participants.filter(p => p.busId === bus.id);
-        return busParticipants.length > 0 && busParticipants.every(p => p.paymentStatus === 'paid');
+        const busFamilies = families.filter(f => f.busId === bus.id);
+        return busFamilies.length > 0 && busFamilies.every(f => f.paymentStatus === 'Paid');
     }).length;
     
     const outstandingCountEl = document.getElementById('outstandingCount');
     const collectionRateEl = document.getElementById('collectionRate');
     const fullPaidBusesEl = document.getElementById('fullPaidBuses');
     
-    if (outstandingCountEl) outstandingCountEl.textContent = outstandingCount;
+    if (outstandingCountEl) outstandingCountEl.textContent = outstandingFamilies;
     if (collectionRateEl) collectionRateEl.textContent = `${collectionRate}%`;
     if (fullPaidBusesEl) fullPaidBusesEl.textContent = `${busesWithFullPayment}/${buses.length}`;
 }
@@ -575,17 +673,18 @@ function updateBusPaymentsGrid() {
     busPaymentsGrid.innerHTML = '';
     
     buses.forEach(bus => {
-        const busParticipants = participants.filter(p => p.busId === bus.id);
-        const totalExpected = busParticipants.length * tripSettings.ticketPrice;
-        const totalCollected = busParticipants.reduce((sum, p) => sum + p.amountPaid, 0);
+        const busFamilies = families.filter(f => f.busId === bus.id);
+        const totalExpected = busFamilies.reduce((sum, f) => sum + f.totalAmount, 0);
+        const totalCollected = busFamilies.reduce((sum, f) => sum + f.paidAmount, 0);
         const totalOutstanding = totalExpected - totalCollected;
+        const occupancy = busFamilies.reduce((total, family) => total + family.seats.length, 0);
         
         const busPaymentSummary = document.createElement('div');
         busPaymentSummary.className = 'bus-payment-summary';
         busPaymentSummary.innerHTML = `
             <div class="bus-payment-header">
                 <div class="bus-payment-name">${bus.name}</div>
-                <div class="bus-payment-occupancy">${busParticipants.length}/${bus.capacity}</div>
+                <div class="bus-payment-occupancy">${occupancy}/${bus.capacity}</div>
             </div>
             <div class="bus-payment-stats">
                 <div class="bus-payment-item">
@@ -611,7 +710,27 @@ function updateBusPaymentsGrid() {
 function initializeEventListeners() {
     console.log('Initializing event listeners...');
     
-    // Add Participant Modal
+    // Selection mode controls
+    const assignSelectedSeatsBtn = document.getElementById('assignSelectedSeatsBtn');
+    const clearAllSelectionsBtn = document.getElementById('clearAllSelectionsBtn');
+    
+    if (assignSelectedSeatsBtn) assignSelectedSeatsBtn.addEventListener('click', openFamilyModalWithSeats);
+    if (clearAllSelectionsBtn) clearAllSelectionsBtn.addEventListener('click', clearAllSelections);
+    
+    // Family Modal
+    const addFamilyBtn = document.getElementById('addFamilyBtn');
+    const closeFamilyModalBtn = document.getElementById('closeFamilyModalBtn');
+    const cancelFamilyModalBtn = document.getElementById('cancelFamilyModalBtn');
+    const saveFamilyBtn = document.getElementById('saveFamilyBtn');
+    const numberOfMembers = document.getElementById('numberOfMembers');
+    
+    if (addFamilyBtn) addFamilyBtn.addEventListener('click', openAddFamilyModal);
+    if (closeFamilyModalBtn) closeFamilyModalBtn.addEventListener('click', closeAddFamilyModal);
+    if (cancelFamilyModalBtn) cancelFamilyModalBtn.addEventListener('click', closeAddFamilyModal);
+    if (saveFamilyBtn) saveFamilyBtn.addEventListener('click', saveFamily);
+    if (numberOfMembers) numberOfMembers.addEventListener('change', generateFamilyMemberFields);
+    
+    // Individual Participant Modal
     const addParticipantBtn = document.getElementById('addParticipantBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
     const cancelModalBtn = document.getElementById('cancelModalBtn');
@@ -620,15 +739,7 @@ function initializeEventListeners() {
     if (addParticipantBtn) addParticipantBtn.addEventListener('click', openAddParticipantModal);
     if (closeModalBtn) closeModalBtn.addEventListener('click', closeAddParticipantModal);
     if (cancelModalBtn) cancelModalBtn.addEventListener('click', closeAddParticipantModal);
-    if (saveParticipantBtn) saveParticipantBtn.addEventListener('click', saveParticipant);
-    
-    // Bus selection change in participant modal
-    const participantBus = document.getElementById('participantBus');
-    if (participantBus) participantBus.addEventListener('change', handleBusSelectionChange);
-    
-    // Bus filter change
-    const filterByBus = document.getElementById('filterByBus');
-    if (filterByBus) filterByBus.addEventListener('change', updateParticipantsTable);
+    if (saveParticipantBtn) saveParticipantBtn.addEventListener('click', saveIndividualParticipant);
     
     // Payment Modal
     const closePaymentModalBtn = document.getElementById('closePaymentModalBtn');
@@ -650,12 +761,12 @@ function initializeEventListeners() {
     if (cancelAddBusBtn) cancelAddBusBtn.addEventListener('click', closeAddBusModal);
     if (saveBusBtn) saveBusBtn.addEventListener('click', saveNewBus);
     
-    // Seat Management
+    // Single Seat Management
     const assignSeatBtn = document.getElementById('assignSeatBtn');
     const clearSelectionBtn = document.getElementById('clearSelectionBtn');
     
     if (assignSeatBtn) assignSeatBtn.addEventListener('click', assignSelectedSeat);
-    if (clearSelectionBtn) clearSelectionBtn.addEventListener('click', clearSeatSelection);
+    if (clearSelectionBtn) clearSelectionBtn.addEventListener('click', clearAllSelections);
     
     // Settings
     const updateSettingsBtn = document.getElementById('updateSettingsBtn');
@@ -667,8 +778,12 @@ function initializeEventListeners() {
     if (exportReportBtn) exportReportBtn.addEventListener('click', exportFullReport);
     if (exportBusReportBtn) exportBusReportBtn.addEventListener('click', exportBusReport);
     
+    // Bus filter change
+    const filterByBus = document.getElementById('filterByBus');
+    if (filterByBus) filterByBus.addEventListener('change', updateParticipantsTable);
+    
     // Close modals when clicking outside
-    const modals = ['addParticipantModal', 'paymentModal', 'addBusModal'];
+    const modals = ['addFamilyModal', 'addParticipantModal', 'paymentModal', 'addBusModal'];
     modals.forEach(modalId => {
         const modal = document.getElementById(modalId);
         if (modal) {
@@ -681,32 +796,206 @@ function initializeEventListeners() {
     });
 }
 
-// Fixed bus selection change handler
-function handleBusSelectionChange() {
-    console.log('Bus selection changed');
-    updateSeatOptions();
+// Family Management Functions
+function openFamilyModalWithSeats() {
+    if (selectedSeats.length === 0) return;
+    
+    openAddFamilyModal();
+    
+    // Pre-fill number of members based on selected seats
+    const numberOfMembers = document.getElementById('numberOfMembers');
+    if (numberOfMembers) {
+        numberOfMembers.value = selectedSeats.length.toString();
+        generateFamilyMemberFields();
+    }
+    
+    // Pre-select current bus
+    const familyBus = document.getElementById('familyBus');
+    if (familyBus) {
+        familyBus.value = currentBusId;
+    }
+    
+    // Update selected seats summary
+    updateSelectedSeatsSummary();
 }
 
-// Modal Functions
-function openAddParticipantModal() {
-    console.log('Opening add participant modal...');
-    const addParticipantModal = document.getElementById('addParticipantModal');
+function openAddFamilyModal() {
+    console.log('Opening add family modal...');
+    const addFamilyModal = document.getElementById('addFamilyModal');
     
-    // Reset and update bus options first
     updateBusOptions();
     
-    // Pre-select current bus if no seat is selected, otherwise use the bus from seat selection
+    // Pre-select current bus if no seats selected
+    const familyBus = document.getElementById('familyBus');
+    if (familyBus && selectedSeats.length === 0) {
+        familyBus.value = currentBusId;
+    }
+    
+    if (addFamilyModal) addFamilyModal.classList.remove('hidden');
+}
+
+function closeAddFamilyModal() {
+    const addFamilyModal = document.getElementById('addFamilyModal');
+    const addFamilyForm = document.getElementById('addFamilyForm');
+    const familyMembersContainer = document.getElementById('familyMembersContainer');
+    
+    if (addFamilyModal) addFamilyModal.classList.add('hidden');
+    if (addFamilyForm) addFamilyForm.reset();
+    if (familyMembersContainer) familyMembersContainer.innerHTML = '';
+}
+
+function generateFamilyMemberFields() {
+    const numberOfMembers = document.getElementById('numberOfMembers');
+    const familyMembersContainer = document.getElementById('familyMembersContainer');
+    
+    if (!numberOfMembers || !familyMembersContainer) return;
+    
+    const memberCount = parseInt(numberOfMembers.value) || 0;
+    familyMembersContainer.innerHTML = '';
+    
+    for (let i = 1; i <= memberCount; i++) {
+        const memberDiv = document.createElement('div');
+        memberDiv.className = 'family-member';
+        memberDiv.innerHTML = `
+            <div class="family-member-header">
+                <h5 class="family-member-title">Member ${i}</h5>
+            </div>
+            <div class="family-member-fields">
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <input type="text" class="form-control" name="memberName${i}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Age *</label>
+                    <input type="number" class="form-control" name="memberAge${i}" required min="1" max="120">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Contact</label>
+                    <input type="tel" class="form-control" name="memberContact${i}">
+                </div>
+            </div>
+        `;
+        familyMembersContainer.appendChild(memberDiv);
+    }
+    
+    updateSelectedSeatsSummary();
+}
+
+function updateSelectedSeatsSummary() {
+    const selectedSeatsSummary = document.getElementById('selectedSeatsSummary');
+    const selectedSeatsForFamily = document.getElementById('selectedSeatsForFamily');
+    
+    if (!selectedSeatsSummary || !selectedSeatsForFamily) return;
+    
+    if (selectedSeats.length > 0) {
+        selectedSeatsSummary.style.display = 'block';
+        selectedSeatsForFamily.textContent = selectedSeats.sort((a, b) => a - b).join(', ');
+    } else {
+        selectedSeatsSummary.style.display = 'none';
+    }
+}
+
+function saveFamily() {
+    console.log('Saving family...');
+    const form = document.getElementById('addFamilyForm');
+    if (!form || !form.checkValidity()) {
+        if (form) form.reportValidity();
+        return;
+    }
+    
+    const familyName = document.getElementById('familyName').value;
+    const numberOfMembersValue = parseInt(document.getElementById('numberOfMembers').value);
+    const busId = parseInt(document.getElementById('familyBus').value);
+    const paymentStatus = document.getElementById('familyPaymentStatus').value;
+    const amountPaid = parseInt(document.getElementById('familyAmountPaid').value) || 0;
+    
+    // Collect member details
+    const members = [];
+    for (let i = 1; i <= numberOfMembersValue; i++) {
+        const name = document.querySelector(`input[name="memberName${i}"]`).value;
+        const age = parseInt(document.querySelector(`input[name="memberAge${i}"]`).value);
+        const contact = document.querySelector(`input[name="memberContact${i}"]`).value || '';
+        
+        members.push({ name, age, contact });
+    }
+    
+    // Calculate total amount based on ages
+    const totalAmount = members.reduce((sum, member) => {
+        if (member.age >= 60) return sum + pricing.seniorFare;
+        if (member.age < 18) return sum + pricing.childFare;
+        return sum + pricing.adultFare;
+    }, 0);
+    
+    // Use selected seats or auto-assign
+    let assignedSeats = [];
+    if (selectedSeats.length > 0) {
+        assignedSeats = [...selectedSeats];
+    } else {
+        // Auto-assign next available seats
+        assignedSeats = getNextAvailableSeats(busId, numberOfMembersValue);
+    }
+    
+    const newFamily = {
+        id: Date.now(),
+        familyName,
+        members,
+        busId,
+        seats: assignedSeats,
+        totalAmount,
+        paidAmount: amountPaid,
+        paymentStatus
+    };
+    
+    families.push(newFamily);
+    
+    const bus = buses.find(b => b.id === busId);
+    addActivity(`${familyName} family registered for ${bus ? bus.name : 'Unknown Bus'}, seats ${assignedSeats.join(', ')}`);
+    
+    // Update UI
+    clearAllSelections();
+    updateDashboard();
+    updateParticipantsTable();
+    updateFinancialSection();
+    initializeBusTabs();
+    if (busId === currentBusId) {
+        generateBusLayout();
+    }
+    
+    closeAddFamilyModal();
+}
+
+function getNextAvailableSeats(busId, count) {
+    const bookedSeats = families
+        .filter(f => f.busId === busId)
+        .flatMap(f => f.seats);
+    
+    const availableSeats = [];
+    for (let i = 1; i <= 56 && availableSeats.length < count; i++) {
+        if (!bookedSeats.includes(i)) {
+            availableSeats.push(i);
+        }
+    }
+    
+    return availableSeats;
+}
+
+// Individual Participant Functions
+function openAddParticipantModal() {
+    console.log('Opening add individual participant modal...');
+    const addParticipantModal = document.getElementById('addParticipantModal');
+    
+    updateBusOptions();
+    
+    // Pre-select current bus and seat if available
     const participantBus = document.getElementById('participantBus');
     if (participantBus) {
         participantBus.value = currentBusId;
-        // Trigger the change event to update seat options
-        handleBusSelectionChange();
+        updateSeatOptions();
         
-        // Pre-select seat if available
-        if (selectedSeat) {
+        if (selectedSeats.length === 1) {
             const participantSeat = document.getElementById('participantSeat');
             if (participantSeat) {
-                participantSeat.value = selectedSeat;
+                participantSeat.value = selectedSeats[0];
             }
         }
     }
@@ -722,12 +1011,193 @@ function closeAddParticipantModal() {
     if (addParticipantForm) addParticipantForm.reset();
 }
 
+function updateSeatOptions() {
+    const participantSeat = document.getElementById('participantSeat');
+    const participantBus = document.getElementById('participantBus');
+    
+    if (!participantSeat || !participantBus) return;
+    
+    const selectedBusId = parseInt(participantBus.value);
+    participantSeat.innerHTML = '<option value="">Select Seat (Optional)</option>';
+    
+    if (!selectedBusId) return;
+    
+    // Get booked seats for selected bus
+    const bookedSeats = families
+        .filter(f => f.busId === selectedBusId)
+        .flatMap(f => f.seats);
+    
+    // Generate available seats (1-56)
+    for (let i = 1; i <= 56; i++) {
+        if (!bookedSeats.includes(i)) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `Seat ${i}`;
+            participantSeat.appendChild(option);
+        }
+    }
+    
+    // Pre-select if there's a selected seat for current bus
+    if (selectedSeats.length === 1 && selectedBusId === currentBusId) {
+        participantSeat.value = selectedSeats[0];
+    }
+}
+
+function saveIndividualParticipant() {
+    console.log('Saving individual participant...');
+    const form = document.getElementById('addParticipantForm');
+    if (!form || !form.checkValidity()) {
+        if (form) form.reportValidity();
+        return;
+    }
+    
+    const name = document.getElementById('participantName').value;
+    const age = parseInt(document.getElementById('participantAge').value);
+    const phone = document.getElementById('participantPhone').value;
+    const busId = parseInt(document.getElementById('participantBus').value);
+    const seatNumber = parseInt(document.getElementById('participantSeat').value) || null;
+    const paymentStatus = document.getElementById('participantPaymentStatus').value;
+    const amountPaid = parseInt(document.getElementById('participantAmountPaid').value) || 0;
+    
+    // Calculate fare based on age
+    let fare = pricing.adultFare;
+    if (age >= 60) fare = pricing.seniorFare;
+    else if (age < 18) fare = pricing.childFare;
+    
+    // Auto-assign seat if not selected
+    let assignedSeat = seatNumber;
+    if (!assignedSeat) {
+        const availableSeats = getNextAvailableSeats(busId, 1);
+        assignedSeat = availableSeats[0];
+    }
+    
+    const newFamily = {
+        id: Date.now(),
+        familyName: name.split(' ')[0], // Use first name as family name
+        members: [{
+            name,
+            age,
+            contact: phone
+        }],
+        busId,
+        seats: [assignedSeat],
+        totalAmount: fare,
+        paidAmount: amountPaid,
+        paymentStatus
+    };
+    
+    families.push(newFamily);
+    
+    const bus = buses.find(b => b.id === busId);
+    addActivity(`${name} registered individually for ${bus ? bus.name : 'Unknown Bus'}, seat ${assignedSeat}`);
+    
+    // Update UI
+    clearAllSelections();
+    updateDashboard();
+    updateParticipantsTable();
+    updateFinancialSection();
+    initializeBusTabs();
+    if (busId === currentBusId) {
+        generateBusLayout();
+    }
+    
+    closeAddParticipantModal();
+}
+
+// Payment Functions
+function updateFamilyPayment(familyId) {
+    openPaymentModal(familyId);
+}
+
+function openPaymentModal(familyId) {
+    const family = families.find(f => f.id === familyId);
+    if (!family) return;
+    
+    currentFamilyForPayment = family;
+    const bus = buses.find(b => b.id === family.busId);
+    
+    const paymentFamilyName = document.getElementById('paymentFamilyName');
+    const paymentFamilyBus = document.getElementById('paymentFamilyBus');
+    const paymentFamilySeats = document.getElementById('paymentFamilySeats');
+    const paymentFamilyMembers = document.getElementById('paymentFamilyMembers');
+    const paymentCurrentStatus = document.getElementById('paymentCurrentStatus');
+    const paymentCurrentAmount = document.getElementById('paymentCurrentAmount');
+    const paymentTotalExpected = document.getElementById('paymentTotalExpected');
+    const updatePaymentStatus = document.getElementById('updatePaymentStatus');
+    const updateAmountPaid = document.getElementById('updateAmountPaid');
+    const paymentModal = document.getElementById('paymentModal');
+    
+    if (paymentFamilyName) paymentFamilyName.textContent = `${family.familyName} Family`;
+    if (paymentFamilyBus) paymentFamilyBus.textContent = bus ? bus.name : 'N/A';
+    if (paymentFamilySeats) paymentFamilySeats.textContent = family.seats.join(', ');
+    if (paymentFamilyMembers) paymentFamilyMembers.textContent = family.members.length;
+    if (paymentCurrentStatus) paymentCurrentStatus.textContent = family.paymentStatus;
+    if (paymentCurrentAmount) paymentCurrentAmount.textContent = family.paidAmount;
+    if (paymentTotalExpected) paymentTotalExpected.textContent = family.totalAmount;
+    if (updatePaymentStatus) updatePaymentStatus.value = family.paymentStatus;
+    if (updateAmountPaid) updateAmountPaid.value = family.paidAmount;
+    
+    if (paymentModal) paymentModal.classList.remove('hidden');
+}
+
+function closePaymentModal() {
+    const paymentModal = document.getElementById('paymentModal');
+    if (paymentModal) paymentModal.classList.add('hidden');
+    currentFamilyForPayment = null;
+}
+
+function savePaymentUpdate() {
+    if (!currentFamilyForPayment) return;
+    
+    const newStatus = document.getElementById('updatePaymentStatus').value;
+    const newAmount = parseInt(document.getElementById('updateAmountPaid').value) || 0;
+    
+    const family = families.find(f => f.id === currentFamilyForPayment.id);
+    if (family) {
+        const oldAmount = family.paidAmount;
+        family.paymentStatus = newStatus;
+        family.paidAmount = newAmount;
+        
+        if (newAmount !== oldAmount) {
+            addActivity(`Payment updated for ${family.familyName} family - ₹${newAmount}`);
+        }
+        
+        updateDashboard();
+        updateParticipantsTable();
+        updateFinancialSection();
+    }
+    
+    closePaymentModal();
+}
+
+function editFamily(familyId) {
+    updateFamilyPayment(familyId);
+}
+
+function removeFamily(familyId) {
+    if (confirm('Are you sure you want to remove this entire family?')) {
+        const family = families.find(f => f.id === familyId);
+        const bus = buses.find(b => b.id === family.busId);
+        families = families.filter(f => f.id !== familyId);
+        
+        addActivity(`${family.familyName} family was removed from ${bus ? bus.name : 'the trip'}`);
+        
+        updateDashboard();
+        updateParticipantsTable();
+        updateFinancialSection();
+        initializeBusTabs();
+        if (family.busId === currentBusId) {
+            generateBusLayout();
+        }
+    }
+}
+
+// Bus Management Functions
 function openAddBusModal() {
     console.log('Opening add bus modal...');
     const addBusModal = document.getElementById('addBusModal');
     const busName = document.getElementById('busName');
     
-    // Pre-fill next bus number
     const nextBusNumber = buses.length + 1;
     if (busName) busName.value = `Bus ${nextBusNumber}`;
     
@@ -740,85 +1210,6 @@ function closeAddBusModal() {
     
     if (addBusModal) addBusModal.classList.add('hidden');
     if (addBusForm) addBusForm.reset();
-}
-
-function openPaymentModal(participantId) {
-    const participant = participants.find(p => p.id === participantId);
-    if (!participant) return;
-    
-    currentParticipantForPayment = participant;
-    const bus = buses.find(b => b.id === participant.busId);
-    
-    const paymentParticipantName = document.getElementById('paymentParticipantName');
-    const paymentParticipantBus = document.getElementById('paymentParticipantBus');
-    const paymentParticipantSeat = document.getElementById('paymentParticipantSeat');
-    const paymentCurrentStatus = document.getElementById('paymentCurrentStatus');
-    const paymentCurrentAmount = document.getElementById('paymentCurrentAmount');
-    const updatePaymentStatus = document.getElementById('updatePaymentStatus');
-    const updateAmountPaid = document.getElementById('updateAmountPaid');
-    const paymentModal = document.getElementById('paymentModal');
-    
-    if (paymentParticipantName) paymentParticipantName.textContent = participant.name;
-    if (paymentParticipantBus) paymentParticipantBus.textContent = bus ? bus.name : 'N/A';
-    if (paymentParticipantSeat) paymentParticipantSeat.textContent = participant.seatNumber || 'Not assigned';
-    if (paymentCurrentStatus) paymentCurrentStatus.textContent = participant.paymentStatus;
-    if (paymentCurrentAmount) paymentCurrentAmount.textContent = participant.amountPaid;
-    if (updatePaymentStatus) updatePaymentStatus.value = participant.paymentStatus;
-    if (updateAmountPaid) updateAmountPaid.value = participant.amountPaid;
-    
-    if (paymentModal) paymentModal.classList.remove('hidden');
-}
-
-function closePaymentModal() {
-    const paymentModal = document.getElementById('paymentModal');
-    if (paymentModal) paymentModal.classList.add('hidden');
-    currentParticipantForPayment = null;
-}
-
-// Business Logic Functions
-function saveParticipant() {
-    console.log('Saving participant...');
-    const form = document.getElementById('addParticipantForm');
-    if (!form || !form.checkValidity()) {
-        if (form) form.reportValidity();
-        return;
-    }
-    
-    const name = document.getElementById('participantName').value;
-    const phone = document.getElementById('participantPhone').value;
-    const busId = parseInt(document.getElementById('participantBus').value);
-    const seatNumber = parseInt(document.getElementById('participantSeat').value) || null;
-    const paymentStatus = document.getElementById('participantPaymentStatus').value;
-    const amountPaid = parseInt(document.getElementById('participantAmountPaid').value) || 0;
-    
-    const newParticipant = {
-        id: Date.now(),
-        name,
-        phone,
-        busId,
-        seatNumber,
-        paymentStatus,
-        amountPaid,
-        registrationDate: new Date().toISOString().split('T')[0]
-    };
-    
-    participants.push(newParticipant);
-    
-    // Add activity
-    const bus = buses.find(b => b.id === busId);
-    addActivity(`${name} registered for ${bus ? bus.name : 'Unknown Bus'}, seat ${seatNumber || 'TBD'}`);
-    
-    // Update UI
-    updateDashboard();
-    updateParticipantsTable();
-    updateFinancialSection();
-    initializeBusTabs();
-    if (busId === currentBusId) {
-        generateBusLayout();
-    }
-    
-    closeAddParticipantModal();
-    clearSeatSelection();
 }
 
 function saveNewBus() {
@@ -843,7 +1234,6 @@ function saveNewBus() {
     
     addActivity(`${busName} added to the fleet`);
     
-    // Update UI
     initializeBusTabs();
     updateDashboard();
     updateBusFilterOptions();
@@ -852,93 +1242,27 @@ function saveNewBus() {
     closeAddBusModal();
 }
 
-function editParticipant(participantId) {
-    updatePayment(participantId);
-}
-
-function removeParticipant(participantId) {
-    if (confirm('Are you sure you want to remove this participant?')) {
-        const participant = participants.find(p => p.id === participantId);
-        const bus = buses.find(b => b.id === participant.busId);
-        participants = participants.filter(p => p.id !== participantId);
-        
-        addActivity(`${participant.name} was removed from ${bus ? bus.name : 'the trip'}`);
-        
-        updateDashboard();
-        updateParticipantsTable();
-        updateFinancialSection();
-        initializeBusTabs();
-        if (participant.busId === currentBusId) {
-            generateBusLayout();
-        }
-    }
-}
-
-function updatePayment(participantId) {
-    openPaymentModal(participantId);
-}
-
-function savePaymentUpdate() {
-    if (!currentParticipantForPayment) return;
-    
-    const newStatus = document.getElementById('updatePaymentStatus').value;
-    const newAmount = parseInt(document.getElementById('updateAmountPaid').value) || 0;
-    
-    const participant = participants.find(p => p.id === currentParticipantForPayment.id);
-    if (participant) {
-        const oldAmount = participant.amountPaid;
-        participant.paymentStatus = newStatus;
-        participant.amountPaid = newAmount;
-        
-        if (newAmount !== oldAmount) {
-            addActivity(`Payment updated for ${participant.name} - ₹${newAmount}`);
-        }
-        
-        updateDashboard();
-        updateParticipantsTable();
-        updateFinancialSection();
-    }
-    
-    closePaymentModal();
-}
-
 function assignSelectedSeat() {
-    if (!selectedSeat) return;
-    openAddParticipantModal();
-}
-
-function clearSeatSelection() {
-    if (selectedSeat) {
-        const seatElement = document.querySelector(`[data-seat="${selectedSeat}"][data-bus-id="${currentBusId}"]`);
-        if (seatElement) {
-            seatElement.classList.remove('selected');
-            seatElement.classList.add('available');
-        }
+    if (selectedSeats.length === 1) {
+        openAddParticipantModal();
     }
-    
-    selectedSeat = null;
-    const seatSelectionInfo = document.getElementById('seatSelectionInfo');
-    if (seatSelectionInfo) seatSelectionInfo.style.display = 'none';
 }
 
+// Settings and Export Functions
 function updateSettings() {
-    const newPrice = parseInt(document.getElementById('ticketPriceInput').value);
+    const newAdultFare = parseInt(document.getElementById('adultFareInput').value);
+    const newChildFare = parseInt(document.getElementById('childFareInput').value);
+    const newSeniorFare = parseInt(document.getElementById('seniorFareInput').value);
     const newDate = document.getElementById('nextTripInput').value;
     const newDestination = document.getElementById('destinationInput').value;
     
-    if (newPrice && newPrice > 0) {
-        tripSettings.ticketPrice = newPrice;
-    }
+    if (newAdultFare && newAdultFare > 0) pricing.adultFare = newAdultFare;
+    if (newChildFare && newChildFare > 0) pricing.childFare = newChildFare;
+    if (newSeniorFare && newSeniorFare > 0) pricing.seniorFare = newSeniorFare;
+    if (newDate) tripSettings.nextTripDate = newDate;
+    if (newDestination) tripSettings.destination = newDestination;
     
-    if (newDate) {
-        tripSettings.nextTripDate = newDate;
-    }
-    
-    if (newDestination) {
-        tripSettings.destination = newDestination;
-    }
-    
-    addActivity(`Trip settings updated - Price: ₹${tripSettings.ticketPrice}, Destination: ${tripSettings.destination}`);
+    addActivity(`Trip settings updated - Adult: ₹${pricing.adultFare}, Child: ₹${pricing.childFare}, Senior: ₹${pricing.seniorFare}`);
     
     updateDashboard();
     updateFinancialSection();
@@ -950,44 +1274,48 @@ function exportFullReport() {
     const reportData = {
         tripDate: tripSettings.nextTripDate,
         destination: tripSettings.destination,
-        ticketPrice: tripSettings.ticketPrice,
+        pricing: pricing,
         totalBuses: buses.length,
-        totalParticipants: participants.length,
-        totalExpected: participants.length * tripSettings.ticketPrice,
-        totalCollected: participants.reduce((sum, p) => sum + p.amountPaid, 0),
-        participants: participants.map(p => {
-            const bus = buses.find(b => b.id === p.busId);
+        totalFamilies: families.length,
+        totalParticipants: families.reduce((total, family) => total + family.members.length, 0),
+        totalExpected: families.reduce((sum, family) => sum + family.totalAmount, 0),
+        totalCollected: families.reduce((sum, family) => sum + family.paidAmount, 0),
+        families: families.map(f => {
+            const bus = buses.find(b => b.id === f.busId);
             return {
-                name: p.name,
-                phone: p.phone,
+                familyName: f.familyName,
+                members: f.members.length,
                 bus: bus ? bus.name : 'N/A',
-                seat: p.seatNumber || '',
-                paymentStatus: p.paymentStatus,
-                amountPaid: p.amountPaid,
-                outstanding: tripSettings.ticketPrice - p.amountPaid
+                seats: f.seats.join(', '),
+                paymentStatus: f.paymentStatus,
+                amountPaid: f.paidAmount,
+                totalAmount: f.totalAmount,
+                outstanding: f.totalAmount - f.paidAmount
             };
         })
     };
     
-    const csv = generateFullCSV(reportData);
-    downloadCSV(csv, `pilgrimage_full_report_${new Date().toISOString().split('T')[0]}.csv`);
+    const csv = generateFamilyCSV(reportData);
+    downloadCSV(csv, `pilgrimage_family_report_${new Date().toISOString().split('T')[0]}.csv`);
 }
 
 function exportBusReport() {
     const busReportData = buses.map(bus => {
-        const busParticipants = participants.filter(p => p.busId === bus.id);
-        const totalExpected = busParticipants.length * tripSettings.ticketPrice;
-        const totalCollected = busParticipants.reduce((sum, p) => sum + p.amountPaid, 0);
+        const busFamilies = families.filter(f => f.busId === bus.id);
+        const totalParticipants = busFamilies.reduce((total, family) => total + family.members.length, 0);
+        const totalExpected = busFamilies.reduce((sum, family) => sum + family.totalAmount, 0);
+        const totalCollected = busFamilies.reduce((sum, family) => sum + family.paidAmount, 0);
         
         return {
             busName: bus.name,
             capacity: bus.capacity,
-            occupied: busParticipants.length,
-            available: bus.capacity - busParticipants.length,
+            families: busFamilies.length,
+            occupied: totalParticipants,
+            available: bus.capacity - totalParticipants,
             totalExpected,
             totalCollected,
             outstanding: totalExpected - totalCollected,
-            occupancyRate: Math.round((busParticipants.length / bus.capacity) * 100)
+            occupancyRate: Math.round((totalParticipants / bus.capacity) * 100)
         };
     });
     
@@ -995,26 +1323,28 @@ function exportBusReport() {
     downloadCSV(csv, `pilgrimage_bus_report_${new Date().toISOString().split('T')[0]}.csv`);
 }
 
-function generateFullCSV(data) {
-    const headers = ['Name', 'Phone', 'Bus', 'Seat', 'Payment Status', 'Amount Paid', 'Outstanding'];
-    const rows = data.participants.map(p => [
-        p.name,
-        p.phone,
-        p.bus,
-        p.seat,
-        p.paymentStatus,
-        p.amountPaid,
-        p.outstanding
+function generateFamilyCSV(data) {
+    const headers = ['Family Name', 'Members', 'Bus', 'Seats', 'Payment Status', 'Amount Paid', 'Total Amount', 'Outstanding'];
+    const rows = data.families.map(f => [
+        f.familyName,
+        f.members,
+        f.bus,
+        f.seats,
+        f.paymentStatus,
+        f.amountPaid,
+        f.totalAmount,
+        f.outstanding
     ]);
     
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
 }
 
 function generateBusCSV(data) {
-    const headers = ['Bus Name', 'Capacity', 'Occupied', 'Available', 'Total Expected', 'Total Collected', 'Outstanding', 'Occupancy Rate'];
+    const headers = ['Bus Name', 'Capacity', 'Families', 'Occupied', 'Available', 'Total Expected', 'Total Collected', 'Outstanding', 'Occupancy Rate'];
     const rows = data.map(bus => [
         bus.busName,
         bus.capacity,
+        bus.families,
         bus.occupied,
         bus.available,
         bus.totalExpected,
