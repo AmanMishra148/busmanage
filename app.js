@@ -1,54 +1,7 @@
 // Application Data with Enhanced Family Support
-let buses = [
-    {
-        id: 1,
-        name: "Bus 1",
-        capacity: 56,
-        occupancy: 5
-    },
-    {
-        id: 2,
-        name: "Bus 2", 
-        capacity: 56,
-        occupancy: 0
-    },
-    {
-        id: 3,
-        name: "Bus 3",
-        capacity: 56,
-        occupancy: 0
-    }
-];
+let buses = [];
 
-let families = [
-    {
-        id: 1,
-        familyName: "Sharma",
-        members: [
-            {name: "Raj Sharma", age: 45, contact: "9876543210"},
-            {name: "Priya Sharma", age: 42, contact: "9876543211"},
-            {name: "Arjun Sharma", age: 18, contact: "9876543212"}
-        ],
-        busId: 1,
-        seats: [1, 2, 3],
-        totalAmount: 4500,
-        paidAmount: 4500,
-        paymentStatus: "Paid"
-    },
-    {
-        id: 2,
-        familyName: "Patel",
-        members: [
-            {name: "Amit Patel", age: 38, contact: "9876543220"},
-            {name: "Sunita Patel", age: 35, contact: "9876543221"}
-        ],
-        busId: 1,
-        seats: [4, 5],
-        totalAmount: 3000,
-        paidAmount: 1500,
-        paymentStatus: "Partial"
-    }
-];
+let families = [];
 
 let pricing = {
     adultFare: 1500,
@@ -68,6 +21,33 @@ let selectedSeats = [];
 let isMultiSelectionMode = false;
 let currentFamilyForPayment = null;
 let financialChart = null;
+
+// Function to load data from Firebase
+async function loadBuses() {
+  const busesRef = db.collection('buses');
+  const snapshot = await busesRef.get();
+  
+  buses = [];
+  snapshot.forEach(doc => {
+    buses.push({
+      id: doc.id,
+      ...doc.data()
+    });
+  });
+  
+  updateDashboard();
+}
+
+// Function to save family booking
+async function saveFamilyBooking(familyData) {
+  try {
+    await db.collection('families').add(familyData);
+    alert('Family booked successfully!');
+    loadBuses(); // Refresh data
+  } catch (error) {
+    alert('Error: ' + error.message);
+  }
+}
 
 // Initialize Application
 document.addEventListener('DOMContentLoaded', function() {
